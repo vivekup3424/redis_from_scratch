@@ -1,56 +1,87 @@
-
 package main
 
 import (
 	"fmt"
-	"net"
+	"log"
+	"syscall"
 )
 
-func msg(msg string) {
-	fmt.Println(msg)
-}
+func handleConnection(connfd int, addr syscall.Sockaddr) {
+	fmt.Printf("Client connected from: %s\n", addr)
 
-func die(msg string) {
-	fmt.Printf("[ERROR] %s\n", msg)
-	panic(msg)
-}
-
-func doSomething(conn net.Conn) {
-	rbuf := make([]byte, 64)
-	n, err := conn.Read(rbuf)
+	// Read from connection
+	buffer := make([]byte, 64)
+	n, err := syscall.Read(connfd, buffer)
 	if err != nil {
-		msg("read() error")
+		log.Fatalf("Read failed with error: %v", err)
 		return
 	}
-	fmt.Printf("client says: %s\n", string(rbuf[:n]))
+	fmt.Printf("Client says: %s\n", string(buffer[:n]))
 
-	wbuf := []byte("world")
-	_, err = conn.Write(wbuf)
+	// Write to connection
+	message := []byte("world")
+	_, err = syscall.Write(connfd, message)
 	if err != nil {
-		msg("write() error")
+		log.Fatalf("Write failed with error: %v", err)
+		return
 	}
+
+	// Close connection
+	syscall.Close(connfd)
 }
 
-func main() {
-	// Create a TCP socket
-	fd, err := net.Listen("tcp", ":1234")
+func server() {
+	//creating a tcp socket
+	sockfd, err := syscall.Socket(syscall.AF_INET,
+		syscall.SOCK_STREAM,
+		0)
 	if err != nil {
-		die("socket() failed")
+		log.Fatalf("Socket creation failed with error: %v", err)
+		return
 	}
-	defer fd.Close()
+	defer syscall.Close(sockfd)
 
-	// Accept connections in a loop
+	//setting socket options
+	val := 1
+	if err := syscall.SetsockoptInt(sockfd,
+		syscall.SOL_SOCKET,
+		syscall.SO_REUSEADDR,
+		val); err != nil {
+		log.Fatalf("Failed to set socket options: %v", err)
+		return
+	}
+
+	// Bind the socket to the wildcard address
+	var addr syscall.SockaddrInet4
+	addr.Port = 1234
+	addr.Addr = [4]byte{0, 0, 0, 0} // Wildcard address
+
+	if err := syscall.Bind(sockfd, &addr); err != nil {
+		log.Fatalf("Bind failed with error: %v", err)
+		return
+	}
+
+	fmt.Println("Socket bound successfully to address")
+
+	//start listening for incoming connections
+	if err := syscall.Listen(sockfd, syscall.SOMAXCONN); err != nil {
+		log.Fatalf("Listen failed with error: %v", &err)
+		return
+	}
+
 	for {
-		conn, err := fd.Accept()
+		// Accept incoming connections
+		connfd, sockAddr, err := syscall.Accept(sockfd)
 		if err != nil {
-			msg("accept() error")
+			log.Fatalf("Accept failed with error: %v", err)
 			continue
 		}
 
-		// Handle connection in a separate goroutine
-		go func(conn net.Conn) {
-			defer conn.Close()
-			doSomething(conn)
-		}(conn)
+		// Handle each connection concurrently
+		go handleConnection(connfd, sockAddr)
 	}
 }
+
+//for how to setsockopt on golang I referred to
+//https://iximiuz.com/en/posts/go-net-http-setsockopt-example
+//and golang docs on syscall

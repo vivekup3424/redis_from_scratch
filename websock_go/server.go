@@ -27,7 +27,8 @@ func handleConnection(connfd int, addr syscall.Sockaddr) {
 	}
 
 	// Close connection
-	syscall.Close(connfd)
+	syscall.Close(connfd) // in place of immediantely closing the connection I
+	//I am thinking of introducing some control flow here
 }
 
 func server() {

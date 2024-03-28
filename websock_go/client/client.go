@@ -29,13 +29,9 @@ func client() int {
 	}
 
 	var addr syscall.SockaddrInet4
-	addr.Port = 80
+	addr.Port = 1234
 	addr.Addr = [4]byte{127, 0, 0, 1} //loopbackaddress
 
-	if err := syscall.Bind(sockfd, &addr); err != nil {
-		log.Fatalf("Bind failed with error: %v", err)
-		return 1
-	}
 	fmt.Println("Socket bound successfully to address")
 
 	//try to connect to the server
@@ -48,7 +44,6 @@ func client() int {
 	if _, err = syscall.Write(sockfd, message); err != nil {
 		log.Fatalf("Write failed with error: %v", err)
 	}
-
 	//read from server
 	buffer := make([]byte, 64)
 	if _, err := syscall.Read(sockfd, buffer); err != nil {

@@ -6,6 +6,28 @@ import (
 	"syscall"
 )
 
+func handleConnection(connfd int) {
+	// Read from connection
+	buffer := make([]byte, 64)
+	n, err := syscall.Read(connfd, buffer)
+	if err != nil {
+		log.Fatalf("Read failed with error: %v", err)
+		return
+	}
+	fmt.Printf("Client says: %s\n", string(buffer[:n]))
+
+	// Write to connection
+	message := []byte("world")
+	_, err = syscall.Write(connfd, message)
+	if err != nil {
+		log.Fatalf("Write failed with error: %v", err)
+		return
+	}
+
+	// Close connection
+	syscall.Close(connfd)
+}
+
 func socket() {
 	//creating a tcp socket
 	sockfd, err := syscall.Socket(syscall.AF_INET,
@@ -39,7 +61,25 @@ func socket() {
 
 	fmt.Println("Socket bound successfully to address")
 
-	//for how to setsockopt on golang I referred to
-	//https://iximiuz.com/en/posts/go-net-http-setsockopt-example
-	//and golang docs on syscall
+	//start listening for incoming connections
+	if err := syscall.Listen(sockfd, syscall.SOMAXCONN); err != nil {
+		log.Fatalf("Listen failed with error: %v", &err)
+		return
+	}
+
+	for {
+		// Accept incoming connections
+		connfd, _, err := syscall.Accept(sockfd)
+		if err != nil {
+			log.Fatalf("Accept failed with error: %v", err)
+			continue
+		}
+
+		// Handle each connection concurrently
+		go handleConnection(connfd)
+	}
 }
+
+//for how to setsockopt on golang I referred to
+//https://iximiuz.com/en/posts/go-net-http-setsockopt-example
+//and golang docs on syscall

@@ -1,4 +1,4 @@
-flags= -Wall -O2 -std c2x 
+flags= -Wall -O2 -std=c2x 
 ldflags=  
 tree: tree.o
 	cc ${flags} $^ -o $@ ${ldflags}
